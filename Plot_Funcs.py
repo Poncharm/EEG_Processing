@@ -1,6 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
+from main import *
+from Processing_Fucs import *
+
 def plot_results(eeg=np.zeros(100), c_mass=np.zeros(100), averaged_power=np.zeros(100), sd=np.zeros(100), binar=np.zeros(100)):
     """Plot the data using subplots."""
     # Создаем оси графика

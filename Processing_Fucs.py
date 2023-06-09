@@ -1,98 +1,64 @@
-#@title Calc. func.
 import mne
 import numpy as np
 from scipy import integrate
 
 def load_and_filter_raw_data(file_path, l_freq=1.0, h_freq=50.0):
     """Load raw data from the specified file and apply bandpass filter."""
-    raw = mne.io.read_raw_edf(file_path, preload=True, encoding='latin1')
-    # Apply bandpass filter
+    raw = mne.io.read_raw_edf(file_path, preload=True)
     raw.filter(l_freq, h_freq, fir_design='firwin')
     return raw
-
 
 def change_data_range(channel_data, start_index, end_index):
     """Filter the desired range of data and convert to microvolts."""
     return channel_data[start_index:end_index] * (10 ** 6)
 
-
-def create_wavelet(window, a, b):
+def create_wavelet(window, a, b, f_max):
     """Create a Morlet wavelet based on the provided parameters."""
-    wavelet = (1 / a ** 0.5) * np.exp(-((((window - b) / a) ** 2) / 2)) * (np.cos(2 * np.pi * F_MAX * (window - b) / a))
+    wavelet = (1 / a ** 0.5) * np.exp(-((((window - b) / a) ** 2) / 2)) * (np.cos(2 * np.pi * f_max * (window - b) / a))
     return wavelet
 
-
-def calculate_wavelet_transform(eeg_window, window, a, b):
+def calculate_wavelet_transform(eeg_window, window, a, b, f_max):
     """Calculate the wavelet transform using the provided parameters."""
-    return integrate.trapz(eeg_window * create_wavelet(window, a, b), window)
+    return integrate.trapz(eeg_window * create_wavelet(window, a, b, f_max), window)
 
-
-def generate_wavelet_matrix(eeg):
+def generate_wavelet_matrix(eeg, k_dis, n_a, f_max, a_mass, morlet_half_period):
     """Generate a matrix containing wavelet transform values."""
-    c_mass = [[0] * N for i in range(N_A)]
+    n = len(eeg)
+    c_mass = [[0] * n for _ in range(n_a)]
 
-    for j in range(MORLET_HALF_PERIOD, N - MORLET_HALF_PERIOD):
-        st = j - MORLET_HALF_PERIOD
-        en = j + MORLET_HALF_PERIOD
-        window = T[st:en]
+    for j in range(morlet_half_period, n - morlet_half_period):
+        st = j - morlet_half_period
+        en = j + morlet_half_period
+        window = np.linspace(st / k_dis, en / k_dis, en - st)
         eeg_window = eeg[st:en]  # Обрабатываем массив eeg здесь
-        b = [T[j] for _ in range(len(window))]  # Определяем b здесь
-        for i in range(N_A):
-            a = A_MASS[i]
-            c_mass[i][j] = calculate_wavelet_transform(eeg_window, window, a, b)
+        b = [window[int(len(window) / 2)] for _ in range(len(window))]  # Определяем b здесь
+        for i in range(n_a):
+            a = a_mass[i]
+            c_mass[i][j] = calculate_wavelet_transform(eeg_window, window, a, b, f_max)
     return c_mass
 
-
-def compute_instant_power(c_mass):
+def compute_instant_power(c_mass, a_mass, f_research, f_max):
     """Compute the instantaneous power within the desired range."""
-    instant_power = [0 for i in range(N)]
+    n = len(c_mass[0])
+    instant_power = [0 for _ in range(n)]
     for i in range(len(c_mass)):
-        if F_MAX / A_MASS[i] >= F_RESEARCH[0] and F_MAX / A_MASS[i] <= F_RESEARCH[1]:
+        if f_research[0] <= f_max / a_mass[i] <= f_research[1]:
             for j in range(len(c_mass[i])):
                 instant_power[j] += c_mass[i - 1][j]
     return instant_power
 
-
-def compute_averaged_power(instant_power):
+def compute_averaged_power(instant_power, absence_half_period, morlet_half_period, k_dis):
     """Compute the averaged power within the desired range."""
-    averaged_power = [0 for i in range(N)]
-    for i in range(ABSENCE_HALF_PERIOD + MORLET_HALF_PERIOD, N - ABSENCE_HALF_PERIOD - MORLET_HALF_PERIOD):
-        for j in range(ABSENCE_HALF_PERIOD):
-            averaged_power[i] = (integrate.trapz(instant_power[i - ABSENCE_HALF_PERIOD:i + ABSENCE_HALF_PERIOD],
-                                        T[i - ABSENCE_HALF_PERIOD:i + ABSENCE_HALF_PERIOD])) / (ABSENCE_HALF_PERIOD * 2 / K_DIS)
+    n = len(instant_power)
+    averaged_power = [0 for _ in range(n)]
+    for i in range(absence_half_period + morlet_half_period, n - absence_half_period - morlet_half_period):
+        averaged_power[i] = (integrate.trapz(instant_power[i - absence_half_period:i + absence_half_period], dx=1/k_dis)) / (2 * absence_half_period / k_dis)
     return averaged_power
 
-def compute_standard_deviation(instant_power):
-    """Compute the standart deviation within the desired range."""
-    sd = [0 for i in range(N)]
-    for i in range(ABSENCE_HALF_PERIOD + MORLET_HALF_PERIOD, N - ABSENCE_HALF_PERIOD - MORLET_HALF_PERIOD):
-      sd[i] = np.std(instant_power[i-ABSENCE_HALF_PERIOD:i+ABSENCE_HALF_PERIOD])
+def compute_standard_deviation(instant_power, absence_half_period, morlet_half_period):
+    """Compute the standard deviation within the desired range."""
+    n = len(instant_power)
+    sd = [0 for _ in range(n)]
+    for i in range(absence_half_period + morlet_half_period, n - absence_half_period - morlet_half_period):
+        sd[i] = np.std(instant_power[i - absence_half_period:i + absence_half_period])
     return sd
-
-
-def binarize_data(averaged_power, sd):
-    """Convert data into a binary form."""
-    binar = [0 for i in range(N)]
-    sequence_indices = []  # list to hold start and end indices of sequences of 1s
-    for i in range(N):
-        if (averaged_power[i] >= W_MIN and averaged_power[i] <= W_MAX) and (sd[i] >= SD_MIN and sd[i] <= SD_MAX):
-            binar[i] = 1
-
-    count = 0  # count of consecutive 1s
-    start = 0  # start index of sequence of 1s
-    for i in range(N):
-        if binar[i] == 1:
-            if count == 0:  # new sequence of 1s starts
-                start = i
-            count += 1
-        elif count > 0:  # sequence of 1s ended
-            sequence_indices.append((start, i-1))  # save start and end indices
-            count = 0  # reset count
-    if count > 0:  # check if there is a sequence of 1s at the end
-        sequence_indices.append((start, N-1))  # save start and end indices
-
-    # If there is a start of an absence but no end, assume the absence lasts till the end of the data
-    if len(sequence_indices) > 0 and len(sequence_indices[-1]) == 1:
-        sequence_indices[-1] = (sequence_indices[-1][0], N-1)
-
-    return binar, sequence_indices
