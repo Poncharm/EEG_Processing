@@ -1,0 +1,8 @@
+print(w_min, w_max, mean_power, sd_min, sd_max, mean_sd)
+            print(f'w_min: {round(w_min, 2)}, w_max: {round(w_max, 2)}, sd_min: {round(w_min, 2)}, sd_max: {round(sd_max, 2)}')
+            file.write(f"Processed file: {FILE} \n")
+            file.write(f'timestamp: {start}-{end} c. \n')
+            file.write(f'w_min: {round(w_min, 2)}, w_max: {round(w_max, 2)}, sd_min: {round(w_min, 2)}, sd_max: {round(sd_max, 2)}')
+            file.write('\n')
+            file.write('\n')
+

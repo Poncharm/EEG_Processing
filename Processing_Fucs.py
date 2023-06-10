@@ -52,8 +52,9 @@ def compute_averaged_power(instant_power, absence_half_period, morlet_half_perio
     n = len(instant_power)
     averaged_power = [0 for _ in range(n)]
     for i in range(absence_half_period + morlet_half_period, n - absence_half_period - morlet_half_period):
-        averaged_power[i] = (integrate.trapz(instant_power[i - absence_half_period:i + absence_half_period], dx=1/k_dis)) / (2 * absence_half_period / k_dis)
-    return averaged_power
+        averaged_power[i] = (integrate.trapz(instant_power[i - absence_half_period:i + absence_half_period], dx=1/k_dis))\
+                            / (2 * absence_half_period / k_dis)
+    return averaged_power[absence_half_period + morlet_half_period: - absence_half_period - morlet_half_period]
 
 def compute_standard_deviation(instant_power, absence_half_period, morlet_half_period):
     """Compute the standard deviation within the desired range."""
@@ -61,4 +62,15 @@ def compute_standard_deviation(instant_power, absence_half_period, morlet_half_p
     sd = [0 for _ in range(n)]
     for i in range(absence_half_period + morlet_half_period, n - absence_half_period - morlet_half_period):
         sd[i] = np.std(instant_power[i - absence_half_period:i + absence_half_period])
-    return sd
+    return sd[absence_half_period + morlet_half_period: - absence_half_period - morlet_half_period]
+
+def compute_zero_crossings(eeg, absence_half_period, morlet_half_period):
+    """Count the number of zero crossings."""
+    counter_mass = list()
+    for i in range(absence_half_period + morlet_half_period, len(eeg) - absence_half_period - morlet_half_period):
+        counter = 0
+        for j in range(i - absence_half_period, i + absence_half_period):
+            if eeg[j]>0 and eeg[j+1]<0: counter+=1
+            if eeg[j]<0 and eeg[j+1]>0: counter+=1
+        counter_mass.append(counter)
+    return counter_mass
